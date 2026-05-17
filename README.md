@@ -24,12 +24,15 @@ TabSaver 由三个部分协作：
 2. 解压到任意目录
 3. 运行 `install.bat`
 4. 按照提示完成 Chrome 扩展加载
+5. 双击 `TabSaver.exe` 启动，可右键发送快捷方式到桌面
 
 ### 方式二：从源码运行
 
+需要安装 Python 3.10+ 和 Pillow。
+
 ```bash
 # 克隆仓库
-git clone https://github.com/yourname/TabSaver.git
+git clone https://github.com/Hoooomie/TabSaver.git
 cd TabSaver
 
 # 运行安装脚本
@@ -72,7 +75,7 @@ start.bat
 
 ### 4. 启动桌面端
 
-双击 `TabSaver.exe`（或运行 `start.bat`）。
+双击 `TabSaver.exe` 即可启动。也可以右键 → 发送到 → 桌面快捷方式，以后从桌面一键打开。
 
 ## 使用方法
 
@@ -80,6 +83,37 @@ start.bat
 2. 关闭 Chrome 时，所有标签页会被自动保存
 3. 打开 TabSaver 桌面端，左侧显示历史会话列表
 4. 选中一个会话，点击 **一键恢复** 即可在 Chrome 中打开所有标签页
+
+## 从源码构建 exe
+
+```bash
+pip install pyinstaller Pillow
+pyinstaller --onefile --noconsole --name TabSaver --icon=app/tab-saver.ico --distpath ./dist app/main.py
+```
+
+构建产物在 `dist/TabSaver.exe`，无需 Python 环境即可运行。
+
+## 项目结构
+
+```
+TabSaver/
+├── extension/              # Chrome 扩展 (Manifest V3)
+│   ├── manifest.json
+│   ├── background.js       # 标签页监控与 Native Messaging 通信
+│   ├── popup.html / .js    # 扩展弹窗
+│   └── icons/              # 扩展图标
+├── native-host/            # Native Messaging Host
+│   ├── tab_saver_host.py   # 接收扩展消息，写入 sessions.json
+│   └── com.tabsaver.host.json  # NM 清单文件
+├── app/                    # Python 桌面端
+│   ├── main.py             # tkinter UI + 会话管理 + 一键恢复
+│   ├── tab-saver.ico       # 应用图标
+│   └── requirements.txt    # Python 依赖
+├── install.bat             # 安装脚本
+├── start.bat               # 启动脚本（源码运行时使用）
+├── README.md
+└── LICENSE
+```
 
 ## 数据存储
 
@@ -98,6 +132,7 @@ start.bat
 - **Chrome 扩展**: Manifest V3, Service Worker
 - **Native Messaging Host**: Python 3, Chrome Native Messaging 协议
 - **桌面端**: Python 3 + tkinter
+- **打包**: PyInstaller
 
 ## 许可证
 
