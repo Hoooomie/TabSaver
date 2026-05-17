@@ -1,0 +1,9 @@
+{
+  "name": "com.tabsaver.host",
+  "description": "TabSaver Native Messaging Host - 保存Chrome标签页到本地",
+  "path": "C:\\Users\\19515\\AppData\\Roaming\\TabSaver\\native-host\\tab_saver_host.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://EXTENSION_ID_PLACEHOLDER/"
+  ]
+}

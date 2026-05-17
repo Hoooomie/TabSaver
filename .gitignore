@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data (user-specific, not for repo)
+data/sessions.json
+
+# Preview (not part of project)
+preview.html

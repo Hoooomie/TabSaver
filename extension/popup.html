@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a73e8;
+    }
+    .header .icon {
+      font-size: 20px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .status-label {
+      color: #666;
+      font-size: 12px;
+    }
+    .status-value {
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .status-connected {
+      color: #34a853;
+    }
+    .status-disconnected {
+      color: #ea4335;
+    }
+    .btn-sync {
+      width: 100%;
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-sync:hover {
+      background: #1557b0;
+    }
+    .btn-sync:active {
+      background: #174ea6;
+    }
+    .tip {
+      margin-top: 12px;
+      padding: 8px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="icon">💾</span>
+    <h1>TabSaver</h1>
+  </div>
+
+  <div class="status-row">
+    <span class="status-label">Native Host 连接</span>
+    <span id="connectionStatus" class="status-value">检测中...</span>
+  </div>
+
+  <div class="status-row">
+    <span class="status-label">当前标签页数</span>
+    <span id="tabCount" class="status-value">-</span>
+  </div>
+
+  <div class="status-row">
+    <span class="status-label">上次同步</span>
+    <span id="lastSync" class="status-value">-</span>
+  </div>
+
+  <button id="btnSync" class="btn-sync">立即同步</button>
+
+  <div class="tip">
+    标签页数据会在每次变化时自动同步。<br>
+    关闭Chrome时，所有标签页将被保存到本地。
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
