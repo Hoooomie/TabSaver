@@ -323,9 +323,11 @@ class TabSaverApp:
             timestamp = session.get('timestamp', '')
             tab_count = session.get('tabCount', 0)
 
-            # 格式化时间显示
+            # 格式化时间显示（UTC转本地时区）
             try:
                 dt = datetime.fromisoformat(timestamp)
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone()
                 time_str = dt.strftime('%Y-%m-%d %H:%M')
             except (ValueError, TypeError):
                 time_str = timestamp
@@ -357,9 +359,11 @@ class TabSaverApp:
         tabs = session.get('tabs', [])
         tab_count = session.get('tabCount', len(tabs))
 
-        # 更新标题
+        # 更新标题（UTC转本地时区）
         try:
             dt = datetime.fromisoformat(timestamp)
+            if dt.tzinfo is not None:
+                dt = dt.astimezone()
             time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
         except (ValueError, TypeError):
             time_str = timestamp
