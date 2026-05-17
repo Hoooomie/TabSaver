@@ -48,6 +48,12 @@
     .status-disconnected {
       color: #ea4335;
     }
+    .mode-auto {
+      color: #34a853;
+    }
+    .mode-manual {
+      color: #f9ab00;
+    }
     .btn-sync {
       width: 100%;
       margin-top: 12px;
@@ -90,6 +96,11 @@
   </div>
 
   <div class="status-row">
+    <span class="status-label">保存模式</span>
+    <span id="modeStatus" class="status-value">-</span>
+  </div>
+
+  <div class="status-row">
     <span class="status-label">当前标签页数</span>
     <span id="tabCount" class="status-value">-</span>
   </div>
@@ -101,7 +112,7 @@
 
   <button id="btnSync" class="btn-sync">立即同步</button>
 
-  <div class="tip">
+  <div class="tip" id="tipText">
     标签页数据会在每次变化时自动同步。<br>
     关闭Chrome时，所有标签页将被保存到本地。
   </div>

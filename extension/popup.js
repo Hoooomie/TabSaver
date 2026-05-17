@@ -2,9 +2,11 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const connectionStatus = document.getElementById('connectionStatus');
+  const modeStatus = document.getElementById('modeStatus');
   const tabCount = document.getElementById('tabCount');
   const lastSync = document.getElementById('lastSync');
   const btnSync = document.getElementById('btnSync');
+  const tipText = document.getElementById('tipText');
 
   // 获取状态
   function refreshStatus() {
@@ -12,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (chrome.runtime.lastError || !response) {
         connectionStatus.textContent = '未连接';
         connectionStatus.className = 'status-value status-disconnected';
+        modeStatus.textContent = '-';
         tabCount.textContent = '-';
         lastSync.textContent = '-';
         return;
@@ -23,6 +26,18 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         connectionStatus.textContent = '未连接';
         connectionStatus.className = 'status-value status-disconnected';
+      }
+
+      // 显示当前模式
+      const mode = response.mode || 'auto';
+      if (mode === 'manual') {
+        modeStatus.textContent = '手动';
+        modeStatus.className = 'status-value mode-manual';
+        tipText.innerHTML = '手动模式：标签页不会自动保存。<br>请在桌面端应用中点击"保存当前标签页"。';
+      } else {
+        modeStatus.textContent = '自动';
+        modeStatus.className = 'status-value mode-auto';
+        tipText.innerHTML = '标签页数据会在每次变化时自动同步。<br>关闭Chrome时，所有标签页将被保存到本地。';
       }
 
       tabCount.textContent = response.tabCount || '0';

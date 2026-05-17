@@ -5,26 +5,34 @@ TabSaver - Chrome标签页自动保存与恢复工具 (桌面端)
 功能：
 - 读取Native Host保存的标签页会话数据
 - 提供可视化界面浏览和恢复会话
-- 系统托盘常驻，后台运行
 - 一键恢复所有标签页到Chrome
+- 支持自动/手动两种保存模式
+- 手动模式下：直接读取latest_tabs.json，写入sessions.json
+- 可配置最大保存会话数和最少标签页阈值
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
 import os
-import sys
 import subprocess
-import threading
-import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # ========== 路径配置 ==========
 
 APPDATA = os.environ.get('APPDATA', str(Path.home() / 'AppData' / 'Roaming'))
 DATA_DIR = Path(APPDATA) / 'TabSaver' / 'data'
 SESSIONS_FILE = DATA_DIR / 'sessions.json'
+CONFIG_FILE = DATA_DIR / 'config.json'
+LATEST_TABS_FILE = DATA_DIR / 'latest_tabs.json'
+
+# 默认配置
+DEFAULT_CONFIG = {
+    "mode": "auto",
+    "max_sessions": 100,
+    "threshold": 1
+}
 
 # Chrome可能的安装路径
 CHROME_PATHS = [
@@ -32,6 +40,29 @@ CHROME_PATHS = [
     Path('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'),
     Path('C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'),
 ]
+
+
+# ========== 配置管理 ==========
+
+def load_config():
+    """加载配置文件"""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+                config = dict(DEFAULT_CONFIG)
+                config.update({k: v for k, v in cfg.items() if k in DEFAULT_CONFIG})
+                return config
+        except (json.JSONDecodeError, IOError):
+            pass
+    return dict(DEFAULT_CONFIG)
+
+
+def save_config(config):
+    """保存配置文件"""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
 
 
 # ========== 会话数据管理 ==========
@@ -51,25 +82,71 @@ class SessionManager:
             with open(self.sessions_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             sessions = data.get('sessions', [])
-            # 按时间倒序排列
             sessions.sort(key=lambda s: s.get('timestamp', ''), reverse=True)
             return sessions
         except (json.JSONDecodeError, IOError):
             return []
 
-    def delete_session(self, session_id):
-        """删除指定会话"""
+    def _load_sessions_data(self):
+        """加载完整会话数据（包含sessions列表的字典）"""
         if not self.sessions_file.exists():
-            return False
+            return {"sessions": []}
         try:
             with open(self.sessions_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            data['sessions'] = [s for s in data['sessions'] if s.get('id') != session_id]
-            with open(self.sessions_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            return True
+            if 'sessions' in data and isinstance(data['sessions'], list):
+                return data
         except (json.JSONDecodeError, IOError):
-            return False
+            pass
+        return {"sessions": []}
+
+    def _save_sessions_data(self, data):
+        """保存完整会话数据"""
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        temp_file = self.sessions_file.with_suffix('.tmp')
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        try:
+            temp_file.replace(self.sessions_file)
+        except OSError:
+            if self.sessions_file.exists():
+                self.sessions_file.unlink()
+            temp_file.rename(self.sessions_file)
+
+    def add_session(self, tabs, tab_count):
+        """
+        添加一个新会话到sessions.json（用于手动保存）。
+        总是创建新会话，不覆盖已有会话。
+        """
+        now = datetime.now()
+        session_id = now.strftime('%Y%m%d_%H%M%S_') + f'{now.microsecond // 1000:03d}'
+        timestamp = now.isoformat()
+
+        session = {
+            "id": session_id,
+            "timestamp": timestamp,
+            "tabCount": tab_count,
+            "tabs": tabs
+        }
+
+        data = self._load_sessions_data()
+        data['sessions'].append(session)
+
+        # 应用max_sessions限制
+        config = load_config()
+        max_sessions = config.get('max_sessions', DEFAULT_CONFIG['max_sessions'])
+        if len(data['sessions']) > max_sessions:
+            data['sessions'] = data['sessions'][-max_sessions:]
+
+        self._save_sessions_data(data)
+        return session_id
+
+    def delete_session(self, session_id):
+        """删除指定会话"""
+        data = self._load_sessions_data()
+        data['sessions'] = [s for s in data['sessions'] if s.get('id') != session_id]
+        self._save_sessions_data(data)
+        return True
 
     def clear_all_sessions(self):
         """清空所有会话"""
@@ -163,21 +240,15 @@ class TabSaverApp:
         style = ttk.Style()
         style.theme_use('clam')
 
-        # 主色调
-        primary = '#1a73e8'
-        danger = '#ea4335'
-
         style.configure('Title.TLabel', font=('Microsoft YaHei UI', 14, 'bold'), foreground='#1a1a1a')
         style.configure('Subtitle.TLabel', font=('Microsoft YaHei UI', 10), foreground='#666666')
         style.configure('Info.TLabel', font=('Microsoft YaHei UI', 9), foreground='#888888')
         style.configure('Primary.TButton', font=('Microsoft YaHei UI', 10))
         style.configure('Danger.TButton', font=('Microsoft YaHei UI', 9))
+        style.configure('Save.TButton', font=('Microsoft YaHei UI', 10, 'bold'))
         style.configure('Session.TLabel', font=('Microsoft YaHei UI', 11), foreground='#333333')
         style.configure('SessionCount.TLabel', font=('Microsoft YaHei UI', 9), foreground='#1a73e8')
-        style.configure('Tab.TLabel', font=('Microsoft YaHei UI', 9), foreground='#444444')
-        style.configure('Url.TLabel', font=('Consolas', 8), foreground='#888888')
 
-        # 列表框样式
         style.configure('SessionList.TFrame', background='#ffffff')
         style.configure('Detail.TFrame', background='#fafafa')
 
@@ -187,12 +258,18 @@ class TabSaverApp:
         header = ttk.Frame(self.root, padding=(16, 12, 16, 8))
         header.pack(fill=tk.X)
 
-        ttk.Label(header, text="💾 TabSaver", style='Title.TLabel').pack(side=tk.LEFT)
-        ttk.Label(header, text="Chrome标签页自动保存与恢复", style='Subtitle.TLabel').pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Label(header, text="TabSaver", style='Title.TLabel').pack(side=tk.LEFT)
+
+        # 当前模式标签
+        config = load_config()
+        mode = config.get('mode', 'auto')
+        mode_text = "自动模式" if mode == "auto" else "手动模式"
+        mode_color = '#34a853' if mode == 'auto' else '#f9ab00'
+        self.mode_label = ttk.Label(header, text=f"[{mode_text}]", style='Info.TLabel', foreground=mode_color)
+        self.mode_label.pack(side=tk.LEFT, padx=(12, 0))
 
         # Chrome状态
         chrome_status = "Chrome: 已检测到" if self.chrome_path else "Chrome: 未检测到"
-        chrome_color = '#34a853' if self.chrome_path else '#ea4335'
         chrome_label = ttk.Label(header, text=chrome_status, style='Info.TLabel')
         chrome_label.pack(side=tk.RIGHT)
 
@@ -215,6 +292,9 @@ class TabSaverApp:
 
         btn_refresh = ttk.Button(list_header, text="刷新", command=self.refresh_sessions, width=6)
         btn_refresh.pack(side=tk.RIGHT)
+
+        btn_settings = ttk.Button(list_header, text="设置", command=self.open_settings, width=8)
+        btn_settings.pack(side=tk.RIGHT, padx=(0, 4))
 
         # 会话列表框
         list_frame = ttk.Frame(left_frame)
@@ -244,11 +324,14 @@ class TabSaverApp:
         btn_frame = ttk.Frame(left_frame)
         btn_frame.pack(fill=tk.X, pady=(8, 0))
 
-        btn_restore = ttk.Button(btn_frame, text="🔄 一键恢复", command=self.restore_selected, style='Primary.TButton')
-        btn_restore.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 4))
+        self.btn_save = ttk.Button(btn_frame, text="保存当前标签页", command=self.save_current_tabs, style='Save.TButton')
+        self.btn_save.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
 
-        btn_delete = ttk.Button(btn_frame, text="🗑 删除", command=self.delete_selected, style='Danger.TButton')
-        btn_delete.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(4, 0))
+        btn_restore = ttk.Button(btn_frame, text="一键恢复", command=self.restore_selected, style='Primary.TButton')
+        btn_restore.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 2))
+
+        btn_delete = ttk.Button(btn_frame, text="删除", command=self.delete_selected, style='Danger.TButton')
+        btn_delete.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
 
         # 右侧：会话详情
         right_frame = ttk.Frame(main_pane)
@@ -271,7 +354,6 @@ class TabSaverApp:
         scrollbar_right = ttk.Scrollbar(detail_frame)
         scrollbar_right.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # 使用Text控件展示标签页详情（支持富文本）
         self.tab_detail = tk.Text(
             detail_frame,
             yscrollcommand=scrollbar_right.set,
@@ -289,7 +371,6 @@ class TabSaverApp:
         self.tab_detail.pack(fill=tk.BOTH, expand=True)
         scrollbar_right.config(command=self.tab_detail.yview)
 
-        # 配置文本标签样式
         self.tab_detail.tag_configure('title', font=('Microsoft YaHei UI', 10, 'bold'), foreground='#333333')
         self.tab_detail.tag_configure('url', font=('Consolas', 9), foreground='#1a73e8')
         self.tab_detail.tag_configure('separator', font=('Arial', 6), foreground='#e0e0e0')
@@ -304,6 +385,70 @@ class TabSaverApp:
         self.status_label.pack(side=tk.LEFT)
 
         ttk.Button(status_bar, text="清空所有", command=self.clear_all, width=8).pack(side=tk.RIGHT)
+
+    def update_mode_display(self):
+        """更新顶部模式标签"""
+        config = load_config()
+        mode = config.get('mode', 'auto')
+        mode_text = "自动模式" if mode == "auto" else "手动模式"
+        mode_color = '#34a853' if mode == 'auto' else '#f9ab00'
+        self.mode_label.config(text=f"[{mode_text}]", foreground=mode_color)
+
+    def save_current_tabs(self):
+        """
+        手动保存当前Chrome标签页。
+        直接读取 latest_tabs.json，创建新会话写入 sessions.json。
+        无需信号文件和心跳，零延迟。
+        """
+        # 读取 latest_tabs.json
+        if not LATEST_TABS_FILE.exists():
+            messagebox.showwarning(
+                "无法保存",
+                "未找到Chrome标签页数据。\n\n可能原因：\n"
+                "- Chrome浏览器未运行\n"
+                "- TabSaver扩展未启用\n\n"
+                "请确认Chrome已打开且扩展正常工作。"
+            )
+            return
+
+        try:
+            with open(LATEST_TABS_FILE, 'r', encoding='utf-8') as f:
+                latest_data = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            messagebox.showerror("错误", "读取标签页数据失败，文件可能已损坏。")
+            return
+
+        tabs = latest_data.get('tabs', [])
+        tab_count = latest_data.get('tabCount', len(tabs))
+        timestamp_str = latest_data.get('timestamp', '')
+
+        if not tabs:
+            messagebox.showwarning("提示", "当前没有可保存的标签页。")
+            return
+
+        # 检查数据是否新鲜（超过2分钟视为过期）
+        try:
+            sync_dt = datetime.fromisoformat(timestamp_str)
+            if sync_dt.tzinfo is not None:
+                sync_dt = sync_dt.astimezone()
+            elapsed = (datetime.now() - sync_dt).total_seconds()
+            if elapsed > 120:
+                messagebox.showwarning(
+                    "数据可能过期",
+                    f"标签页数据是 {int(elapsed)} 秒前的，可能不是最新的。\n\n"
+                    "请确认Chrome正在运行且TabSaver扩展已启用。"
+                )
+                return
+        except (ValueError, TypeError):
+            pass  # 无法解析时间，继续保存
+
+        # 直接写入 sessions.json（总是创建新会话，不覆盖）
+        try:
+            session_id = self.session_manager.add_session(tabs, tab_count)
+            self.status_label.config(text=f"已保存 {tab_count} 个标签页")
+            self.refresh_sessions()
+        except Exception as e:
+            messagebox.showerror("保存失败", f"写入会话数据时出错：{e}")
 
     def refresh_sessions(self):
         """刷新会话列表"""
@@ -323,7 +468,6 @@ class TabSaverApp:
             timestamp = session.get('timestamp', '')
             tab_count = session.get('tabCount', 0)
 
-            # 格式化时间显示（UTC转本地时区）
             try:
                 dt = datetime.fromisoformat(timestamp)
                 if dt.tzinfo is not None:
@@ -335,7 +479,9 @@ class TabSaverApp:
             display_text = f"{time_str}  ({tab_count}个标签页)"
             self.session_listbox.insert(tk.END, display_text)
 
-        self.status_label.config(text=f"已加载 {len(self.sessions)} 个会话")
+        config = load_config()
+        mode = config.get('mode', 'auto')
+        self.status_label.config(text=f"已加载 {len(self.sessions)} 个会话 | {'自动' if mode == 'auto' else '手动'}模式")
 
     def on_session_select(self, event=None):
         """选中会话时显示详情"""
@@ -359,7 +505,6 @@ class TabSaverApp:
         tabs = session.get('tabs', [])
         tab_count = session.get('tabCount', len(tabs))
 
-        # 更新标题（UTC转本地时区）
         try:
             dt = datetime.fromisoformat(timestamp)
             if dt.tzinfo is not None:
@@ -380,15 +525,11 @@ class TabSaverApp:
             title = tab.get('title', '无标题')
             url = tab.get('url', '')
 
-            # 序号
             self.tab_detail.insert(tk.END, f" {i+1}. ", 'index')
-            # 标题
             self.tab_detail.insert(tk.END, f"{title}\n", 'title')
-            # URL
             self.tab_detail.insert(tk.END, f"    {url}\n", 'url')
-            # 分隔线
             if i < len(tabs) - 1:
-                self.tab_detail.insert(tk.END, "    " + "─" * 40 + "\n", 'separator')
+                self.tab_detail.insert(tk.END, "    " + "-" * 40 + "\n", 'separator')
 
         self.tab_detail.config(state=tk.DISABLED)
 
@@ -396,9 +537,17 @@ class TabSaverApp:
         """显示空状态"""
         self.tab_detail.config(state=tk.NORMAL)
         self.tab_detail.delete('1.0', tk.END)
+
+        config = load_config()
+        mode = config.get('mode', 'auto')
+
         self.tab_detail.insert(tk.END, "\n\n    暂无保存的标签页会话\n\n", 'empty')
-        self.tab_detail.insert(tk.END, "    关闭Chrome浏览器时\n", 'empty')
-        self.tab_detail.insert(tk.END, "    标签页将被自动保存到这里", 'empty')
+        if mode == 'manual':
+            self.tab_detail.insert(tk.END, "    手动模式下，点击下方\n", 'empty')
+            self.tab_detail.insert(tk.END, "    \"保存当前标签页\" 按钮保存\n", 'empty')
+        else:
+            self.tab_detail.insert(tk.END, "    关闭Chrome浏览器时\n", 'empty')
+            self.tab_detail.insert(tk.END, "    标签页将被自动保存到这里", 'empty')
         self.tab_detail.config(state=tk.DISABLED)
         self.detail_title.config(text="选择一个会话查看详情")
         self.detail_count.config(text="")
@@ -462,13 +611,111 @@ class TabSaverApp:
         else:
             messagebox.showerror("错误", "清空会话失败")
 
+    def open_settings(self):
+        """打开设置对话框"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("TabSaver 设置")
+        dialog.geometry("440x340")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # 居中显示
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - 440) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 340) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # 加载当前配置
+        config = load_config()
+
+        # 标题
+        ttk.Label(dialog, text="TabSaver 设置", font=('Microsoft YaHei UI', 14, 'bold')).pack(pady=(20, 16))
+        ttk.Separator(dialog, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20)
+
+        # 设置表单
+        form = ttk.Frame(dialog, padding=20)
+        form.pack(fill=tk.BOTH, expand=True)
+
+        # 保存模式
+        row0 = ttk.Frame(form)
+        row0.pack(fill=tk.X, pady=(0, 4))
+
+        ttk.Label(row0, text="保存模式：", font=('Microsoft YaHei UI', 10)).pack(side=tk.LEFT)
+        mode_var = tk.StringVar(value=config.get('mode', 'auto'))
+        mode_combo = ttk.Combobox(row0, textvariable=mode_var, values=['auto', 'manual'],
+                                   state='readonly', width=10, font=('Microsoft YaHei UI', 10))
+        mode_combo.pack(side=tk.RIGHT)
+
+        mode_desc = ttk.Label(form, text="auto = 自动保存 | manual = 手动保存", font=('Microsoft YaHei UI', 8), foreground='#888888')
+        mode_desc.pack(anchor=tk.W, pady=(0, 12))
+
+        # max_sessions
+        row1 = ttk.Frame(form)
+        row1.pack(fill=tk.X, pady=(0, 4))
+
+        ttk.Label(row1, text="最大保存会话数：", font=('Microsoft YaHei UI', 10)).pack(side=tk.LEFT)
+        max_sessions_var = tk.IntVar(value=config.get('max_sessions', 100))
+        spin_max = ttk.Spinbox(row1, from_=1, to=9999, textvariable=max_sessions_var, width=8, font=('Microsoft YaHei UI', 10))
+        spin_max.pack(side=tk.RIGHT)
+
+        ttk.Label(form, text="超过此数量的旧会话将被自动删除", font=('Microsoft YaHei UI', 8), foreground='#888888').pack(anchor=tk.W, pady=(0, 8))
+
+        # threshold
+        row2 = ttk.Frame(form)
+        row2.pack(fill=tk.X, pady=(0, 4))
+
+        ttk.Label(row2, text="最少标签页数：", font=('Microsoft YaHei UI', 10)).pack(side=tk.LEFT)
+        threshold_var = tk.IntVar(value=config.get('threshold', 1))
+        spin_threshold = ttk.Spinbox(row2, from_=1, to=999, textvariable=threshold_var, width=8, font=('Microsoft YaHei UI', 10))
+        spin_threshold.pack(side=tk.RIGHT)
+
+        ttk.Label(form, text="打开标签页少于此数时不保存会话", font=('Microsoft YaHei UI', 8), foreground='#888888').pack(anchor=tk.W)
+
+        # 按钮
+        btn_frame = ttk.Frame(form)
+        btn_frame.pack(fill=tk.X, pady=(20, 0))
+
+        def save_settings():
+            try:
+                max_val = max_sessions_var.get()
+                thresh_val = threshold_var.get()
+                mode_val = mode_var.get()
+                if max_val < 1 or thresh_val < 1:
+                    messagebox.showwarning("提示", "数值必须大于0", parent=dialog)
+                    return
+                if mode_val not in ('auto', 'manual'):
+                    messagebox.showwarning("提示", "模式必须为 auto 或 manual", parent=dialog)
+                    return
+                new_config = {
+                    "mode": mode_val,
+                    "max_sessions": max_val,
+                    "threshold": thresh_val
+                }
+                save_config(new_config)
+                self.update_mode_display()
+                mode_text = "自动" if mode_val == "auto" else "手动"
+                self.status_label.config(text=f"设置已保存：{mode_text}模式，最多{max_val}个会话，最少{thresh_val}个标签页")
+                dialog.destroy()
+            except (tk.TclError, ValueError):
+                messagebox.showwarning("提示", "请输入有效的数字", parent=dialog)
+
+        ttk.Button(btn_frame, text="保存", command=save_settings, width=10).pack(side=tk.RIGHT, padx=(8, 0))
+        ttk.Button(btn_frame, text="取消", command=dialog.destroy, width=10).pack(side=tk.RIGHT)
+
+        # 支持Enter保存，Esc取消
+        dialog.bind('<Return>', lambda e: save_settings())
+        dialog.bind('<Escape>', lambda e: dialog.destroy())
+
     def start_auto_refresh(self):
         """启动自动刷新（每5秒检查文件变化）"""
+        import threading
+        import time
+
         def auto_refresh():
             while True:
                 try:
                     if self.session_manager.has_changed():
-                        # 在主线程中刷新UI
                         self.root.after(0, self.refresh_sessions)
                 except Exception:
                     pass
