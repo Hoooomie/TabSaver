@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TabSaver - 专注力报告</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部导航栏 -->
+    <header class="header">
+      <div class="header-left">
+        <h1>TabSaver 专注力报告</h1>
+      </div>
+      <div class="header-right">
+        <div class="view-toggle">
+          <button id="btnDay" class="toggle-btn active">日视图</button>
+          <button id="btnWeek" class="toggle-btn">周视图</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 日期导航 -->
+    <nav class="date-nav">
+      <button id="btnPrev" class="nav-btn">&larr; 前一天</button>
+      <span id="dateLabel" class="date-label">-</span>
+      <button id="btnNext" class="nav-btn">后一天 &rarr;</button>
+      <button id="btnToday" class="nav-btn nav-today">今天</button>
+    </nav>
+
+    <!-- 统计摘要 -->
+    <section class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-label">总活跃时长</div>
+        <div class="stat-value" id="statTotal">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">最常访问</div>
+        <div class="stat-value" id="statTopDomain">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">最活跃时段</div>
+        <div class="stat-value" id="statPeakHour">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">专注分数</div>
+        <div class="stat-value" id="statFocusScore">-</div>
+      </div>
+    </section>
+
+    <!-- 图表区域 -->
+    <section class="charts">
+      <div class="chart-row">
+        <div class="chart-card chart-wide">
+          <h2>每小时活跃时间</h2>
+          <div class="chart-wrapper">
+            <canvas id="hourlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-card">
+          <h2>Top 10 站点</h2>
+          <div class="chart-wrapper">
+            <canvas id="topSitesChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h2>分类分布</h2>
+          <div class="chart-wrapper">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 操作栏 -->
+    <footer class="footer">
+      <button id="btnClearData" class="btn-danger">清除追踪数据</button>
+    </footer>
+  </div>
+
+  <script src="../lib/chart.min.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

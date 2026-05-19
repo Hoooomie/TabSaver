@@ -6,7 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabCount = document.getElementById('tabCount');
   const lastSync = document.getElementById('lastSync');
   const btnSync = document.getElementById('btnSync');
+  const btnTracker = document.getElementById('btnTracker');
   const tipText = document.getElementById('tipText');
+  const todayActive = document.getElementById('todayActive');
+  const todayTopDomain = document.getElementById('todayTopDomain');
 
   // 获取状态
   function refreshStatus() {
@@ -52,6 +55,29 @@ document.addEventListener('DOMContentLoaded', () => {
         lastSync.textContent = '-';
       }
     });
+
+    // 获取今日追踪统计
+    refreshTrackerStats();
+  }
+
+  // 获取今日追踪统计
+  function refreshTrackerStats() {
+    chrome.runtime.sendMessage({ action: 'getTodayStats' }, (response) => {
+      if (chrome.runtime.lastError || !response) {
+        todayActive.textContent = '-';
+        todayTopDomain.textContent = '-';
+        return;
+      }
+
+      // 格式化时长
+      const totalMin = Math.floor((response.totalMs || 0) / 60000);
+      const hours = Math.floor(totalMin / 60);
+      const mins = totalMin % 60;
+      todayActive.textContent = hours > 0 ? `${hours}h${mins}m` : `${mins}m`;
+
+      // 最常访问域名
+      todayTopDomain.textContent = response.topDomain || '-';
+    });
   }
 
   // 立即同步按钮
@@ -76,6 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshStatus();
       }, 1000);
     });
+  });
+
+  // 查看专注力报告按钮
+  btnTracker.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
   });
 
   refreshStatus();

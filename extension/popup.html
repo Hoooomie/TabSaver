@@ -73,6 +73,39 @@
     .btn-sync:active {
       background: #174ea6;
     }
+    .btn-tracker {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px 16px;
+      background: #fff;
+      color: #1a73e8;
+      border: 1px solid #1a73e8;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-tracker:hover {
+      background: #e8f0fe;
+    }
+    .tracker-stats {
+      margin-top: 8px;
+      padding: 8px;
+      background: #f0f4ff;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #555;
+    }
+    .tracker-stats .stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+    .tracker-stats .stat-val {
+      font-weight: 500;
+      color: #1a73e8;
+    }
     .tip {
       margin-top: 12px;
       padding: 8px;
@@ -111,6 +144,19 @@
   </div>
 
   <button id="btnSync" class="btn-sync">立即同步</button>
+
+  <button id="btnTracker" class="btn-tracker">查看专注力报告</button>
+
+  <div class="tracker-stats" id="trackerStats">
+    <div class="stat">
+      <span>今日活跃</span>
+      <span class="stat-val" id="todayActive">-</span>
+    </div>
+    <div class="stat">
+      <span>最常访问</span>
+      <span class="stat-val" id="todayTopDomain">-</span>
+    </div>
+  </div>
 
   <div class="tip" id="tipText">
     标签页数据会在每次变化时自动同步。<br>

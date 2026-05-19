@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "TabSaver - 标签页保存器",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "自动记录Chrome标签页，配合TabSaver桌面端一键恢复",
   "permissions": [
     "tabs",
     "nativeMessaging",
-    "storage"
+    "storage",
+    "idle"
   ],
   "background": {
     "service_worker": "background.js"
